@@ -14,12 +14,21 @@ class AutoMeAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val TAG = "AutoMeCaptured"
 
+    private var lastCapturedText: String = ""
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
-            val text = event.text.toString()
-            if (text.isNotEmpty() && text != "[]") {
-                Log.d(TAG, "Captured Sent Message: $text")
-                saveSentMessage(text)
+            val textList = event.text ?: emptyList<CharSequence>()
+            val text = textList.joinToString("")
+            
+            if (text.isEmpty() && lastCapturedText.isNotEmpty()) {
+                // 기존 텍스트가 있다가 비워졌다면 전송 버튼을 누른 것으로 간주
+                Log.d(TAG, "Sent Message Detected (Cleared): $lastCapturedText")
+                saveSentMessage(lastCapturedText)
+                lastCapturedText = ""
+            } else if (text.isNotEmpty()) {
+                // 입력되는 과정을 계속 업데이트
+                lastCapturedText = text
             }
         }
     }

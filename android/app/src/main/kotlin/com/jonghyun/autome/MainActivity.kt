@@ -39,22 +39,45 @@ class MainActivity : FlutterActivity() {
                 val reader = inputStream?.bufferedReader()
                 val content = reader?.readText() ?: ""
                 
-                // 간단한 카카오톡 대화 정규식 파싱 (예: [이름] [시간] 메시지)
-                val regex = Regex("\\[(.+?)\\] \\[(.+?)\\] (.+)")
+                // 한 줄씩 파싱하여 다중 라인 메시지 지원
+                val dateRegex = Regex("-+ (\\d{4})년 (\\d{1,2})월 (\\d{1,2})일 .+ -+")
+                val messageRegex = Regex("^\\[(.+?)\\] \\[(.+?)\\] (.+)$")
+                
                 val messages = mutableListOf<MessageEntity>()
+                var currentSender = ""
+                var currentMessage = StringBuilder()
+                var currentTimestamp = System.currentTimeMillis() - 100000000 // 과거 시간 부여
                 
                 content.lines().forEach { line ->
-                    regex.find(line)?.let { match ->
-                        val sender = match.groupValues[1]
-                        val message = match.groupValues[3]
-                        messages.add(MessageEntity(
-                            roomId = "shared_file_import",
-                            sender = sender,
-                            message = message,
-                            timestamp = System.currentTimeMillis(),
-                            isSentByMe = sender == "나"
-                        ))
+                    if (dateRegex.matches(line)) return@forEach
+                    
+                    val match = messageRegex.find(line)
+                    if (match != null) {
+                        if (currentSender.isNotEmpty()) {
+                            messages.add(MessageEntity(
+                                roomId = "shared_file_import",
+                                sender = currentSender,
+                                message = currentMessage.toString().trimEnd(),
+                                timestamp = currentTimestamp++,
+                                isSentByMe = currentSender == "나" || currentSender == "회원님"
+                            ))
+                            currentMessage.clear()
+                        }
+                        currentSender = match.groupValues[1]
+                        currentMessage.append(match.groupValues[3])
+                    } else if (line.trim().isNotEmpty() && currentSender.isNotEmpty()) {
+                        currentMessage.append("\n").append(line)
                     }
+                }
+                
+                if (currentSender.isNotEmpty() && currentMessage.isNotEmpty()) {
+                    messages.add(MessageEntity(
+                        roomId = "shared_file_import",
+                        sender = currentSender,
+                        message = currentMessage.toString().trimEnd(),
+                        timestamp = currentTimestamp,
+                        isSentByMe = currentSender == "나" || currentSender == "회원님"
+                    ))
                 }
                 
                 if (messages.isNotEmpty()) {

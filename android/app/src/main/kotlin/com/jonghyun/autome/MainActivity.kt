@@ -1,6 +1,7 @@
 package com.jonghyun.autome
 
 import android.content.Intent
+import com.jonghyun.autome.ai.AICoreManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -158,6 +159,73 @@ class MainActivity : FlutterActivity() {
                         launch(Dispatchers.Main) {
                             result.success(resultList)
                         }
+                    }
+                }
+                "getChatRooms" -> {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val db = AppDatabase.getDatabase(applicationContext)
+                        val rooms = db.messageDao().getDistinctRooms()
+                        val resultList = rooms.map {
+                            mapOf(
+                                "roomId" to it.roomId,
+                                "lastSender" to it.lastSender,
+                                "lastMessage" to it.lastMessage,
+                                "lastTimestamp" to it.lastTimestamp,
+                                "messageCount" to it.messageCount
+                            )
+                        }
+                        launch(Dispatchers.Main) {
+                            result.success(resultList)
+                        }
+                    }
+                }
+                "getChatMessages" -> {
+                    val roomId = call.argument<String>("roomId")
+                    if (roomId != null) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val db = AppDatabase.getDatabase(applicationContext)
+                            val messages = db.messageDao().getMessagesForRoom(roomId)
+                            val resultList = messages.map {
+                                mapOf(
+                                    "id" to it.id,
+                                    "roomId" to it.roomId,
+                                    "sender" to it.sender,
+                                    "message" to it.message,
+                                    "timestamp" to it.timestamp,
+                                    "isSentByMe" to it.isSentByMe
+                                )
+                            }
+                            launch(Dispatchers.Main) {
+                                result.success(resultList)
+                            }
+                        }
+                    } else {
+                        result.error("INVALID_ARGUMENT", "roomId is required", null)
+                    }
+                }
+                "generateAiReply" -> {
+                    val roomId = call.argument<String>("roomId")
+                    if (roomId != null) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val aiCoreManager = AICoreManager(applicationContext)
+                                val replies = aiCoreManager.generateReplyFromDb(roomId)
+                                aiCoreManager.close()
+                                launch(Dispatchers.Main) {
+                                    result.success(replies)
+                                }
+                            } catch (e: Exception) {
+                                launch(Dispatchers.Main) {
+                                    result.success(listOf(
+                                        "네, 확인했습니다.",
+                                        "지금은 어렵습니다.",
+                                        "글쎄요, 조금 더 생각해볼게요."
+                                    ))
+                                }
+                            }
+                        }
+                    } else {
+                        result.error("INVALID_ARGUMENT", "roomId is required", null)
                     }
                 }
                 else -> result.notImplemented()

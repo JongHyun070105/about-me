@@ -54,4 +54,43 @@ class NativeBridge {
       return [];
     }
   }
+
+  /// 채팅방 목록 조회 (roomId 기준 그루핑)
+  static Future<List<Map<String, dynamic>>> getChatRooms() async {
+    try {
+      final List<dynamic> result = await _channel.invokeMethod('getChatRooms');
+      return result.map((e) => Map<String, dynamic>.from(e)).toList();
+    } on PlatformException catch (e) {
+      debugPrint('NativeBridge Error (getChatRooms): $e');
+      return [];
+    }
+  }
+
+  /// 특정 채팅방 메시지 조회
+  static Future<List<Map<String, dynamic>>> getChatMessages(String roomId) async {
+    try {
+      final List<dynamic> result = await _channel.invokeMethod(
+        'getChatMessages',
+        {'roomId': roomId},
+      );
+      return result.map((e) => Map<String, dynamic>.from(e)).toList();
+    } on PlatformException catch (e) {
+      debugPrint('NativeBridge Error (getChatMessages): $e');
+      return [];
+    }
+  }
+
+  /// AI 답장 생성 (3가지 페르소나)
+  static Future<List<String>> generateAiReply(String roomId) async {
+    try {
+      final List<dynamic> result = await _channel.invokeMethod(
+        'generateAiReply',
+        {'roomId': roomId},
+      );
+      return result.cast<String>();
+    } on PlatformException catch (e) {
+      debugPrint('NativeBridge Error (generateAiReply): $e');
+      return ['네, 확인했습니다.', '지금은 어렵습니다.', '글쎄요, 조금 더 생각해볼게요.'];
+    }
+  }
 }
